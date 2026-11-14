@@ -27,6 +27,15 @@
   "workspacePlugin": {
     "name": "prestashop",
     "label": "PrestaShop",
+    "needs": [
+      [
+        "dev",
+        "test",
+        "sandboxes",
+        "demos"
+      ],
+      "ai-agents"
+    ],
     "commands": {
       "types": [
         "sites"
