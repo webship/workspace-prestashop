@@ -7,7 +7,8 @@
 # Build a PrestaShop shop in a container: the latest stable 9.x release of the open-source project,
 # or the one --version names, at https://<name>.ddev.site. With --install the shop is installed with
 # the workspace account as its SuperAdmin and, unless --demo-catalog no, with the demo catalog; with
-# --add-users it also gets the default accounts: an employee with a limited profile and two customers.
+# --add-users it also gets the default accounts: an administrator, an employee with a limited profile
+# and two customers.
 
 # Bootstrap.
 # Find the workspace tooling from this script, so a fresh clone needs no setup.

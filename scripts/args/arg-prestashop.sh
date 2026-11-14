@@ -9,11 +9,11 @@ parser.add_argument('-v', '--version',
 parser.add_argument('-i', '--install',
                     action='store_true',
                     default=False,
-                    help='Install the shop, with the workspace account as the SuperAdmin.')
+                    help='Install the shop, with the workspace account as its SuperAdmin.')
 parser.add_argument('-a', '--add-users',
                     action='store_true',
                     default=False,
-                    help='With --install, add the default accounts: an employee with the Salesman profile and two customers with an address, the ones the test scenarios sign in as.')
+                    help='With --install, add the default accounts: an administrator, an employee with the Salesman profile and two customers with an address, the ones the test scenarios sign in as.')
 parser.add_argument('-d', '--demo-catalog',
                     default="yes",
                     choices=['yes', 'no'],
