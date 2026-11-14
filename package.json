@@ -1,0 +1,75 @@
+{
+  "name": "@webship.co/workspace-prestashop",
+  "version": "1.0.7",
+  "description": "PrestaShop for Webship Workspace: the builder (`cmd-prestashop-project.sh`) and the console tool in every sites folder, the default accounts, the PrestaShop step pack wired into the testing setup, and two AI agents in the AI Agents folder.",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/webship/workspace-prestashop.git"
+  },
+  "files": [
+    "dist/src",
+    "agents",
+    "commands",
+    "features",
+    "scripts",
+    "testing",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepare": "npm run build",
+    "test": "npm run build && node --test dist/tests/*.test.js",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "workspacePlugin": {
+    "name": "prestashop",
+    "label": "PrestaShop",
+    "commands": {
+      "types": [
+        "sites"
+      ],
+      "workspaces": [
+        "dev",
+        "test",
+        "sandboxes",
+        "demos"
+      ],
+      "files": [
+        "commands/cmd-prestashop-project.sh",
+        "commands/cmd-tools-prestashop-cli.sh"
+      ]
+    },
+    "scripts": {
+      "functions": [
+        "scripts/functions/fun-prestashop.sh"
+      ],
+      "args": [
+        "scripts/args/arg-prestashop.sh",
+        "scripts/args/arg-prestashop-cli.sh"
+      ],
+      "machine": [
+        "testing/site.feature"
+      ]
+    },
+    "ai": {
+      "agents": [
+        "agents/prestashop-site-builder.md",
+        "agents/prestashop-tester.md"
+      ]
+    },
+    "features": [
+      "features/prestashop.feature"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@webship.co/workspace-plugin-api": "^1.0.7",
+    "typescript": "^5.9.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
