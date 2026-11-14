@@ -29,7 +29,7 @@ export function assistantContext(): string {
     '`bash cmd-prestashop-project.sh <name> --install --add-users` from a sites folder (dev, test, sandboxes, demos),',
     'in a container like every other project, at https://<name>.ddev.site (the back office at /admin-workspace), with the demo catalog unless `--demo-catalog no`.',
     '`bash cmd-tools-prestashop-cli.sh <name>` says what the shop is; `--run "<command>"` runs the console of the shop (bin/console) in it,',
-    '`--clear-cache` clears its cache, `--add-users` adds the default accounts (an employee with the Salesman profile and two customers).',
+    '`--clear-cache` clears its cache, `--add-users` adds the default accounts (an administrator, an employee with the Salesman profile and two customers).',
     '`bash cmd-tools-add-users.sh <name> prestashop` adds the same accounts.',
     '`bash cmd-tools-testing.sh <name>` sets up webship-js with the PrestaShop step pack; `--run` runs the suite.',
     `For PrestaShop work, hand over to the agents ${AGENTS.map((a) => `\`${a}\``).join(' and ')}.`,

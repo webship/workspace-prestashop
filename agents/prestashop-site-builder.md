@@ -34,7 +34,7 @@ bash cmd-prestashop-project.sh myshop --install --add-users
 | --- | --- |
 | `--version <x>` | The PrestaShop 9 release to download: `latest` (the default: the latest stable 9.x release), or a number such as `9.2.1`. |
 | `--install` | Installs the shop, with the workspace account (`account:` in `core/config/settings.yml`) as its SuperAdmin. Without it the code is there and the installer waits at `/install`. |
-| `--add-users` | With `--install`: the default accounts (`salesman`, an employee with the Salesman profile; `customer` and `shopper`, two customers with an address). |
+| `--add-users` | With `--install`: the default accounts (`administrator`, an employee with the SuperAdmin profile; `salesman`, an employee with the Salesman profile; `customer` and `shopper`, two customers with an address). |
 | `--demo-catalog <yes\|no>` | With `--install`: the demo catalog of the release (products, categories, customers, orders). `yes` by default; `no` gives an empty shop. |
 | `--php-version <x>` | The PHP of the project container (`8.3` by default; PrestaShop 9 runs on 8.1 and later). |
 | `--launch` | Opens the shop when it is ready. |
@@ -77,9 +77,9 @@ stack, with the PrestaShop step pack).
 - **The database values are the container's.** The installer is given `db` / `db` / `db` on the
   host `db`, the same in every project. Do not put another host, account or password into
   `app/config/parameters.php`, and do not copy that file between projects.
-- **The SuperAdmin is the workspace account**, never a made-up one. Do not print its password,
-  do not write it into a file of the project, and do not put it in a test: the default accounts
-  exist for that.
+- **The SuperAdmin the installer makes is the workspace account**, never a made-up one. Do not
+  print its password, do not write it into a file of the project, and do not put it in a test: the
+  default accounts exist for that, `administrator@example.com` among them.
 - **Open-source only.** The builder installs the modules of the open-source release and no other.
   The marketplace, account, hosted checkout, marketing and assistant modules that travel in the
   downloaded archive stay uninstalled: do not install or configure them. A module you add comes

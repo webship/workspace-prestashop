@@ -13,7 +13,7 @@ parser.add_argument('-k', '--clear-cache',
 parser.add_argument('-a', '--add-users',
                     action='store_true',
                     default=False,
-                    help='Add the default accounts: an employee with the Salesman profile and two customers. An account that is already there is left as it is.')
+                    help='Add the default accounts: an administrator, an employee with the Salesman profile and two customers. An account that is already there is left as it is.')
 parser.add_argument('-c', '--cancel-users',
                     action='store_true',
                     default=False,

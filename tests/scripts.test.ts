@@ -53,17 +53,16 @@ function bash(script: string, env: Record<string, string> = {}) {
   return r;
 }
 
-test('the default accounts are an employee with a limited profile and two customers, with example addresses', () => {
+test('the default accounts are an administrator, an employee with a limited profile and two customers, with example addresses', () => {
   const r = bash('set_prestashop_users ; for u in "${users[@]}" ; do n="user_${u}_name" ; m="user_${u}_mail" ; p="user_${u}_password" ; l="user_${u}_role" ; k="user_${u}_kind" ; echo "${!n}|${!m}|${!p}|${!l}|${!k}" ; done');
   assert.strictEqual(r.status, 0, r.stderr);
   const rows = r.stdout.trim().split('\n').map((l) => l.split('|'));
-  assert.deepStrictEqual(rows.map((x) => x[0]), ['salesman', 'customer', 'shopper']);
-  assert.deepStrictEqual(rows.map((x) => x[3]), ['Salesman', 'Customer', 'Customer']);
-  assert.deepStrictEqual(rows.map((x) => x[4]), ['employee', 'customer', 'customer']);
-  for (const [name, mail, password, role] of rows) {
-    assert.strictEqual(mail, `${name}@example.com`);
+  assert.deepStrictEqual(rows.map((x) => x[0]), ['administrator', 'salesman', 'customer', 'shopper']);
+  assert.deepStrictEqual(rows.map((x) => x[3]), ['SuperAdmin', 'Salesman', 'Customer', 'Customer']);
+  assert.deepStrictEqual(rows.map((x) => x[4]), ['employee', 'employee', 'customer', 'customer']);
+  for (const [name, mail, password] of rows) {
+    assert.strictEqual(mail, `${name}@example.com`, 'a test account of its own, never the workspace account');
     assert.ok(password.length >= 8, 'the shop asks for 8 characters or more');
-    assert.notStrictEqual(role, 'SuperAdmin', 'the SuperAdmin is the workspace account, never a default account');
   }
 });
 
@@ -81,6 +80,7 @@ test('the testing hook adds the step pack, the back office, the two registries a
   const core = lines.findIndex((l) => l.includes('node_modules/webship-js/tests/step-definitions'));
   assert.strictEqual(lines[core + 1], "      'node_modules/@webship-js/prestashop-steps/tests/step-definitions/**/*.js',", 'the pack is listed right after webship-js');
   assert.match(cucumber, /backOffice: \{ folder: process\.env\.ADMIN_FOLDER \|\| 'admin-workspace' \},/);
+  assert.match(cucumber, /admin: \{ email: process\.env\.SHOP_ADMIN_EMAIL \|\| 'administrator@example\.com', password: process\.env\.SHOP_ADMIN_PASSWORD \|\| '[^']+', name: 'Shop Admin' \},/);
   assert.match(cucumber, /salesman: \{ email: process\.env\.SHOP_SALESMAN_EMAIL \|\| 'salesman@example\.com', password: process\.env\.SHOP_SALESMAN_PASSWORD \|\| '[^']+', name: 'Sam Salesman' \},/);
   assert.match(cucumber, /shopper: \{ email: process\.env\.SHOP_SHOPPER_EMAIL \|\| 'shopper@example\.com'/);
   // Still a module node can load, with the registries where the pack reads them.
@@ -88,12 +88,13 @@ test('the testing hook adds the step pack, the back office, the two registries a
   assert.strictEqual(loaded.status, 0, loaded.stderr);
   const [requires, employees, customers, folder] = JSON.parse(loaded.stdout);
   assert.strictEqual(requires.length, 3);
-  assert.deepStrictEqual(employees, ['salesman'], 'the SuperAdmin is in no registry');
+  assert.deepStrictEqual(employees, ['admin', 'salesman'], 'the handle the pack signs in as, then the limited profile');
+  assert.doesNotMatch(cucumber, /webmaster|account_/, 'the workspace account is in no registry');
   assert.deepStrictEqual(customers, ['customer', 'shopper']);
   assert.strictEqual(folder, 'admin-workspace');
   assert.ok(fs.existsSync(path.join(p.dir, 'tests', 'features', 'site.feature')));
   const calls = fs.readFileSync(log, 'utf8');
-  assert.match(calls, /ddev exec -d \/var\/www\/html\/public PRESTASHOP_ACCOUNTS=employee\\\|salesman@example\.com\\\|\S+\\\|Sam\\\|Salesman\\\|Salesman\\;customer\\\|customer@example\.com\S+ php -- add/, 'an installed shop gets the default accounts, in its docroot');
+  assert.match(calls, /ddev exec -d \/var\/www\/html\/public PRESTASHOP_ACCOUNTS=employee\\\|administrator@example\.com\\\|\S+\\\|Shop\\\|Admin\\\|SuperAdmin\\;employee\\\|salesman@example\.com\\\|\S+\\\|Sam\\\|Salesman\\\|Salesman\\;customer\\\|customer@example\.com\S+ php -- add/, 'an installed shop gets the default accounts, in its docroot');
   // Again, after a person changed the feature: nothing is doubled, nothing is reset.
   fs.writeFileSync(path.join(p.dir, 'tests', 'features', 'site.feature'), 'Feature: mine\n');
   assert.strictEqual(run().status, 0);
@@ -135,6 +136,7 @@ test('the console tool runs a command in the docroot of the shop, and cancels th
   assert.match(fs.readFileSync(log, 'utf8'), /SYMFONY_ENV=prod php bin\/console cache:clear --no-interaction/);
   const r = tool('CANCEL_USERS=yes');
   assert.strictEqual(r.status, 0, r.stderr);
+  assert.match(r.stdout, /User mail: administrator@example\.com/);
   assert.match(r.stdout, /User mail: shopper@example\.com/);
   assert.match(fs.readFileSync(log, 'utf8'), /PRESTASHOP_ACCOUNTS=\S+ php -- cancel/);
 });
@@ -173,14 +175,17 @@ test('a release is chosen from the list the project publishes: the newest stable
   assert.notStrictEqual(pick('9.9.9').status, 0);
 });
 
-test('the first feature names no platform in a step, no account of the workspace, and creates no account', () => {
+test('the first feature names no platform in a step, signs in as each employee, and creates no account', () => {
   const feature = fs.readFileSync(path.join(PKG, 'testing', 'site.feature'), 'utf8');
   const steps = feature.split('\n').filter((l) => /^\s*(Given|When|Then|And|But) /.test(l));
   assert.ok(steps.length >= 10);
   for (const s of steps) assert.doesNotMatch(s, /prestashop/i, s);
   assert.match(feature, /the back office/);
   assert.match(feature, /the shop/);
-  assert.doesNotMatch(feature, /as "admin"/, 'the SuperAdmin is never written into a test');
+  for (const handle of ['admin', 'salesman']) assert.match(feature, new RegExp(`^\\s*\\| ${handle} +\\|`, 'm'), `${handle} logs in to the back office`);
+  assert.match(feature, /as "admin"\n\s+Then I should see "Modules" in the back office menu/, 'what the administrator opens');
+  assert.match(feature, /as "salesman"\n\s+Then I should see "Orders > Orders" in the back office menu\n\s+But I should not see "Modules"/, 'and the salesman does not');
+  assert.doesNotMatch(feature, /webmaster/, 'the workspace account is never written into a test');
   assert.doesNotMatch(feature, /registration|I register|create an account/i, 'a suite never creates an account');
   const passwords = feature.match(/ and "([^"]*)"$/gm) || [];
   assert.deepStrictEqual(passwords, [' and "wrong-password"'], 'the only password is a wrong one, the subject of its scenario');

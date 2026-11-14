@@ -27,7 +27,15 @@ Feature: The shop answers and its accounts work
 
     Examples:
       | handle   | first name |
+      | admin    | Shop       |
       | salesman | Sam        |
+
+  Scenario: The administrator has the whole menu and opens every page
+    Given I am logged in to the back office as "admin"
+    Then I should see "Modules" in the back office menu
+    And I should see "Advanced Parameters > Team" in the back office menu
+    When I open the back office path "improve/modules/manage"
+    Then I should not see the access denied page
 
   Scenario: An employee with a limited profile has the menu of its profile
     Given I am logged in to the back office as "salesman"

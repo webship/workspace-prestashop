@@ -65,7 +65,7 @@ bash cmd-prestashop-project.sh myshop --install --add-users
 | --- | --- |
 | `--version <x>` | The PrestaShop 9 release to download: `latest` (the default: the latest stable 9.x release), or a number such as `9.2.1` |
 | `--install` | Install the shop, with the workspace account as its SuperAdmin |
-| `--add-users` | With `--install`: add the default accounts, an employee with a limited profile and two customers |
+| `--add-users` | With `--install`: add the default accounts, an administrator, an employee with a limited profile and two customers |
 | `--demo-catalog <yes\|no>` | With `--install`: the demo catalog of the release (products, categories, customers, orders). `yes` by default; `no` gives an empty shop |
 | `--php-version <x>` | The PHP of the project container (`8.3`) |
 | `--launch` | Open the shop when it is ready |
@@ -111,13 +111,15 @@ itself. A newer release is a new build.
 
 | Account | What it is | Handle in the tests | Signs in to |
 | --- | --- | --- | --- |
-| the workspace account | the SuperAdmin, made by the installer | none: it is never written into a test | the back office |
+| the workspace account (Workspace Owner) | the SuperAdmin, made by the installer | none: it is never written into a test | the back office |
+| `administrator@example.com` (Shop Admin) | an employee with the SuperAdmin profile | `admin` | the back office |
 | `salesman@example.com` (Sam Salesman) | an employee with the Salesman profile | `salesman` | the back office |
 | `customer@example.com` (Clara Customer) | a customer with one address | `customer` | the shop |
 | `shopper@example.com` (Simon Shopper) | a second customer with one address | `shopper` | the shop |
 
-The three default accounts have the password of the workspace's other default lists. They are for
-local shops and for tests. The console of the shop makes a SuperAdmin and no other account, so they
+The four default accounts have the password of the workspace's other default lists. They are for
+local shops and for tests. The administrator is a test account of its own, so the features of the step
+pack that sign in as `admin` run on a built shop and the workspace account stays out of every test. The console of the shop makes a SuperAdmin and no other account, so they
 are made in the container through the shop's own classes, without the browser.
 `bash cmd-tools-add-users.sh myshop prestashop` and `bash cmd-tools-cancel-users.sh myshop prestashop`
 add and remove the same list.

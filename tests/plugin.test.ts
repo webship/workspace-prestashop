@@ -93,6 +93,7 @@ test('each agent is a definition the AI Agents folder can list: named after its 
   assert.match(tester, /No platform name in a step phrase/);
   assert.match(tester, /Playwright MCP browser first/);
   assert.match(tester, /Never the workspace account/);
+  assert.match(tester, /`admin` \| employees \| `administrator@example\.com`/, 'the tester knows the administrator test account by its handle');
   const builder = read('agents/prestashop-site-builder.md');
   assert.match(builder, /Containers only/);
   assert.match(builder, /Open-source only/);
@@ -119,6 +120,7 @@ test('the docs say container-based, name only Webship, and carry no personal val
   }
   for (const c of COMMANDS) assert.ok(read('README.md').includes(c), `the README lists ${c}`);
   assert.match(read('README.md'), /container-based \(DDEV by default\)/);
+  assert.match(read('README.md'), /`administrator@example\.com` \(Shop Admin\) \| an employee with the SuperAdmin profile \| `admin`/, 'the README lists the administrator test account');
   // A PrestaShop project is a php project to the container tool, so the row's Users menu cannot know its list.
   for (const f of ['README.md', 'agents/prestashop-site-builder.md']) {
     assert.match(read(f), /Users\*{0,2} menu[^.]*(does not add|adds no)/, `${f} says the row's Users menu does not add the accounts`);

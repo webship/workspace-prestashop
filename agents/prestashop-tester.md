@@ -76,6 +76,7 @@ Given I am signed in to the shop as "customer"             # a customer
 
 | Handle | Registry | Account | What it is | Signs in to |
 | --- | --- | --- | --- | --- |
+| `admin` | employees | `administrator@example.com` (Shop Admin) | an employee with the SuperAdmin profile: everything | the back office |
 | `salesman` | employees | `salesman@example.com` (Sam Salesman) | an employee with the Salesman profile: orders and the catalog, no modules, no team | the back office |
 | `customer` | customers | `customer@example.com` (Clara Customer) | a customer with one address | the shop |
 | `shopper` | customers | `shopper@example.com` (Simon Shopper) | a second customer with one address | the shop |
@@ -84,10 +85,10 @@ These are the default accounts (`bash cmd-tools-prestashop-cli.sh myshop --add-u
 for another environment with `SHOP_<HANDLE>_EMAIL` and `SHOP_<HANDLE>_PASSWORD`. The folder of the
 back office is `worldParameters.backOffice.folder` (`ADMIN_FOLDER`).
 
-The pack's own features sign in as `admin`, the SuperAdmin of the shop they were written against.
-Here the SuperAdmin is the workspace account, and it is in no registry. A scenario that needs more
-than the Salesman profile opens needs an employee of its own with the profile that fits: ask for it
-to be added to the shop and to the employees registry.
+`admin` is the default account `administrator@example.com`, the handle the pack's own features sign
+in as. It is not the SuperAdmin the installer made: that one is the workspace account, and it is in
+no registry. A scenario that needs a profile between the two needs an employee of its own with the
+profile that fits: ask for it to be added to the shop and to the employees registry.
 
 ## Rules
 
@@ -96,7 +97,8 @@ to be added to the shop and to the employees registry.
   are in the shop before the suite runs. If a scenario needs a profile the registries do not have,
   say so and ask for the account to be added to the shop and to the registry.
 - **Never the workspace account.** The shop's own SuperAdmin (the workspace account) is not in a
-  registry and its password goes in no file.
+  registry and its password goes in no file. `admin` in the registry is the `administrator@example.com`
+  default account.
 - **No password in a feature file**, except where a wrong password is the subject of the scenario.
 - **No platform name in a step phrase.** A step says what a person does or sees: `I am logged in to
   the back office as "salesman"`, `I am on the shop "cart" page`, `I open "Catalog > Products" in the

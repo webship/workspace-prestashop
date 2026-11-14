@@ -46,15 +46,16 @@ readonly PRESTASHOP_CONSOLE='SYMFONY_ENV=prod php bin/console';
 # The modules of the open-source release (its composer.json), the only ones installed.
 readonly PRESTASHOP_MODULES='blockreassurance,blockwishlist,contactform,dashactivity,dashgoals,dashproducts,dashtrends,graphnvd3,gridhtml,gsitemap,pagesnotfound,productcomments,ps_apiresources,ps_banner,ps_bestsellers,ps_brandlist,ps_cashondelivery,ps_categoryproducts,ps_categorytree,ps_checkpayment,ps_contactinfo,ps_crossselling,ps_currencyselector,ps_customeraccountlinks,ps_customersignin,ps_customtext,ps_dataprivacy,ps_emailalerts,ps_emailsubscription,ps_facetedsearch,ps_faviconnotificationbo,ps_featuredproducts,ps_googleanalytics,ps_imageslider,ps_languageselector,ps_linklist,ps_mainmenu,ps_newproducts,ps_onepagecheckout,ps_searchbar,ps_sharebuttons,ps_shoppingcart,ps_socialfollow,ps_specials,ps_supplierlist,ps_themecusto,ps_viewedproduct,ps_wirepayment,psgdpr,statsbestcategories,statsbestcustomers,statsbestmanufacturers,statsbestproducts,statsbestsuppliers,statsbestvouchers,statscarrier,statscatalog,statscheckup,statsdata,statsforecast,statsnewsletter,statspersonalinfos,statsproduct,statsregistrations,statssales,statssearch,statsstock';
 
-# The default accounts: an employee with a limited profile and two customers with an address, the
-# ones a scenario signs in as. Accounts are configuration, created once in the shop; a test suite
-# never creates or deletes one. The shop signs a person in by the e-mail address; the name is the
-# handle a scenario reads. The role is the profile of an employee, or "Customer".
-# The SuperAdmin of the shop is the workspace account and is not on this list.
+# The default accounts: an employee with every right, an employee with a limited profile and two
+# customers with an address, the ones a scenario signs in as. Accounts are configuration, created
+# once in the shop; a test suite never creates or deletes one. The shop signs a person in by the
+# e-mail address. The role is the profile of an employee, or "Customer".
+# The SuperAdmin the installer makes is the workspace account and is not on this list: the
+# administrator here is a test account of its own, so the workspace account is in no test.
 function set_prestashop_users() {
-  users=(salesman customer shopper);
-  local kinds=(employee customer customer) roles=('Salesman' 'Customer' 'Customer') ;
-  local firstnames=(Sam Clara Simon) lastnames=(Salesman Customer Shopper) i user ;
+  users=(administrator salesman customer shopper);
+  local kinds=(employee employee customer customer) roles=('SuperAdmin' 'Salesman' 'Customer' 'Customer') ;
+  local firstnames=(Shop Sam Clara Simon) lastnames=(Admin Salesman Customer Shopper) i user ;
   for i in "${!users[@]}" ; do
     user="${users[$i]}" ;
     printf -v "user_${user}_name" '%s' "${user}" ;
@@ -131,10 +132,11 @@ function prestashop_console() {
 }
 
 # One release of the list the project publishes: "<version> <archive> <md5>". The list is read in
-# the container; `latest` is the newest stable release of the major line this plugin builds.
+# the container, and asked for again when the network of a container that has just started is not
+# there yet; `latest` is the newest stable release of the major line this plugin builds.
 function prestashop_release() {
   local wanted="$1" ;
-  ddev exec "curl -fsSL ${PRESTASHOP_RELEASES}" 2>/dev/null | python3 -c '
+  ddev exec "curl -fsSL --retry 3 --retry-delay 2 ${PRESTASHOP_RELEASES}" 2>/dev/null | python3 -c '
 import json, sys
 wanted, major = sys.argv[1], sys.argv[2]
 try:
@@ -198,7 +200,7 @@ function prestashop_build() {
 
   # The download holds the shop as an inner archive next to a web unpacker: only the shop is kept.
   echo "Downloading PrestaShop ${version}." ;
-  ddev exec "cd /tmp && curl -fsSL -o release.zip '${archive}' && echo '${checksum}  release.zip' | md5sum -c - \
+  ddev exec "cd /tmp && curl -fsSL --retry 3 --retry-delay 2 -o release.zip '${archive}' && echo '${checksum}  release.zip' | md5sum -c - \
     && unzip -q -o release.zip prestashop.zip && unzip -q -o prestashop.zip -d '${root}' && rm -f release.zip prestashop.zip" \
     || { echo "The PrestaShop ${version} archive could not be downloaded, did not match its checksum, or could not be unpacked." ; exit 1 ; } ;
 
@@ -209,7 +211,7 @@ function prestashop_build() {
     ddev exec -d "${root}" "php install/index_cli.php --domain=${host} \
       --db_server=db --db_name=db --db_user=db --db_password=db --prefix=ps_ \
       --name=$(printf '%q' "${doc_name} ${PROJECT_NAME}") --country=us --language=en --timezone=UTC \
-      --firstname=Shop --lastname=Admin \
+      --firstname=Workspace --lastname=Owner \
       --email=$(printf '%q' "${account_mail}") --password=$(printf '%q' "${account_pass}") \
       --ssl=1 --rewrite=1 --fixtures=${fixtures} --modules=${PRESTASHOP_MODULES}" \
       || { echo "The PrestaShop installer failed." ; exit 1 ; } ;
@@ -334,7 +336,8 @@ foreach (array_filter(explode(';', (string) getenv('PRESTASHOP_ACCOUNTS'))) as $
         $employee->id_lang = $langId;
         $employee->active = true;
         $employee->bo_theme = 'default';
-        $employee->default_tab = (int) Tab::getIdFromClassName('AdminOrders');
+        // Where the back office opens: the dashboard for every right, the orders for a limited profile.
+        $employee->default_tab = (int) Tab::getIdFromClassName($profile === 'SuperAdmin' ? 'AdminDashboard' : 'AdminOrders');
         if (!$employee->add()) {
             echo "   $email could not be created: " . json_encode($employee->validateFields(false, true)) . "\n";
             ++$failed;
@@ -472,11 +475,13 @@ function testing_configure_prestashop() {
 
   echo "Adding the PrestaShop step pack (${PRESTASHOP_STEPS_PACKAGE} ${PRESTASHOP_STEPS_VERSION}).";
   set_prestashop_users ;
-  local registry="" user user_mail user_password user_kind user_firstname user_lastname ;
+  local registry="" user handle user_mail user_password user_kind user_firstname user_lastname ;
   for user in "${users[@]}" ; do
     user_mail="user_${user}_mail"; user_password="user_${user}_password"; user_kind="user_${user}_kind";
     user_firstname="user_${user}_firstname"; user_lastname="user_${user}_lastname";
-    registry="${registry}${!user_kind}|${user}|${!user_mail}|${!user_password}|${!user_firstname} ${!user_lastname}"$'\n' ;
+    # The pack's features call the employee with every right "admin".
+    handle="${user}" ; [ "${user}" == 'administrator' ] && handle="admin" ;
+    registry="${registry}${!user_kind}|${handle}|${!user_mail}|${!user_password}|${!user_firstname} ${!user_lastname}"$'\n' ;
   done
 
   python3 - "${project_path}" "${PRESTASHOP_STEPS_PACKAGE}" "${PRESTASHOP_STEPS_VERSION}" 'SHOP' "${registry}" "$(prestashop_admin_folder "${project_path}")" <<'PYEOF' || return 1
