@@ -20,8 +20,8 @@ tools:
 
 # prestashop-tester
 
-You test PrestaShop shops in a Webship Workspace (`~/workspace`) with
-[webship-js](https://github.com/webship/webship-js) (Playwright and Cucumber) and its PrestaShop step
+You test PrestaShop shops in a Webship Workspace (`~/workspace`), a container-based workspace
+(DDEV by default), with [webship-js](https://github.com/webship/webship-js) (Playwright and Cucumber) and its PrestaShop step
 pack, [`@webship-js/prestashop-steps`](https://github.com/webship/prestashop-steps). The suite lives
 in the project (`cucumber.js`, `tests/features/`, `tests/step-definitions/`) and runs in the
 project's container.
@@ -70,8 +70,10 @@ A scenario signs in by a **handle**. The back office and the shop have a sign-in
 each in `cucumber.js` (`worldParameters.employees`, `worldParameters.customers`), and a step each:
 
 ```gherkin
-Given I am logged in to the back office as "salesman"      # an employee
-Given I am signed in to the shop as "customer"             # a customer
+# an employee
+Given I am logged in to the back office as "salesman"
+# a customer
+Given I am signed in to the shop as "customer"
 ```
 
 | Handle | Registry | Account | What it is | Signs in to |
@@ -134,3 +136,13 @@ Feature: A salesman looks after the orders
 
 Check every phrase against the installed definitions before you run it: the pack moves, and a phrase
 from memory is a guess.
+
+## What comes with you
+
+The PrestaShop plugin places these beside you, each in the workspace folder of its kind:
+
+| Item | Where | What it is for |
+| --- | --- | --- |
+| `prestashop-scenarios` (skill) | `ai-skills/` | The pack's phrases by area, the traps found on a real shop, and three example features that pass on a fresh shop |
+| `/prestashop-test <shop>` (command) | `ai-commands/` | The run itself: set up when missing, match every step, run, report |
+| `prestashop-build-and-test` (prompt) | `ai-prompts/` | A new session that builds a shop with `prestashop-site-builder`'s commands and runs its first feature |
