@@ -207,8 +207,9 @@ landmarks and accessibility audits are used as they are and never redefined for 
 - **A row is compared as the shop writes it.** After a filter by `Name` with `mug`,
   `the first row of the list should contain "Mug"` failed: the row reads `Customizable mug`.
   Write the text of the row, with its capitals.
-- **The search of the modules takes one word.** `When I search the modules for "Main menu"`
-  failed after the wait of the step (each word of the search becomes a tag); `"Banner"` passed.
+- **The search of the modules takes several words.** Each word of the search becomes a tag, and
+  `When I search the modules for "Main menu"` waits for the tag of each word: the list then
+  shows the modules that match all of them. (With the pack before 2.0.1 only one word passed.)
 - **A module step needs the Module manager open first**:
   `When I open "Modules > Module Manager" in the back office menu`.
 - **`Given my cart is empty` opens the cart page.** Go where the scenario starts after it

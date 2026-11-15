@@ -193,3 +193,10 @@ test('the body of an item names no tool or feature of one AI CLI', () => {
   }
   for (const f of manifest.ai.commands) assert.match(read(f), /The first word is/, `${f} says in words what the arguments are`);
 });
+
+// The fixture is the pack at the version the builder pins, so a phrase checked here is one a project really gets.
+test('the fixture is the pack at the version the builder pins', () => {
+  const head = read('tests/fixtures/step-definitions.txt').split('\n')[0];
+  const pin = read('scripts/functions/fun-prestashop.sh').match(/_STEPS_VERSION='\^([0-9.]+)'/)![1];
+  assert.ok(head.includes(`@webship-js/prestashop-steps ${pin} `), `the fixture is read from @webship-js/prestashop-steps ${pin}: ${head}`);
+});

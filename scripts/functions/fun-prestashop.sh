@@ -24,7 +24,7 @@
 
 # The step pack a PrestaShop project is tested with, and the release line it is required at.
 readonly PRESTASHOP_STEPS_PACKAGE='@webship-js/prestashop-steps';
-readonly PRESTASHOP_STEPS_VERSION='^2.0.0';
+readonly PRESTASHOP_STEPS_VERSION='^2.0.1';
 
 # Where the project publishes its releases: the archive of each version and its checksum.
 readonly PRESTASHOP_RELEASES='https://api.prestashop-project.org/prestashop';
