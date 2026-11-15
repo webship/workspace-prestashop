@@ -111,3 +111,11 @@ stack, with the PrestaShop step pack).
 | A blank page or an error 500 after a change | The cache: `bash cmd-tools-prestashop-cli.sh <name> --clear-cache`. |
 | **Add the test users** in the row's Users menu adds no account of the shop | The menu reads the DDEV project type, and a PrestaShop project is a `php` project. Use `bash cmd-tools-prestashop-cli.sh <name> --add-users` or `bash cmd-tools-add-users.sh <name> prestashop`. |
 | `is not a PrestaShop project` from the console tool | The project's docroot has no `bin/console` of a shop: it was not built by this builder. |
+
+## What comes with you
+
+The PrestaShop plugin places these beside you, each in the workspace folder of its kind: the agent
+`prestashop-tester` (`ai-agents/`), the skill `prestashop-scenarios` (`ai-skills/`), the command
+`/prestashop-test <shop>` (`ai-commands/`) and the prompt `prestashop-build-and-test`
+(`ai-prompts/`), which is this agent's whole first job as a launch command: build, say what the
+shop is, set the testing stack up, run the first feature.
