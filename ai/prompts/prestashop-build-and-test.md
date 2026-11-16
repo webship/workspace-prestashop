@@ -9,6 +9,7 @@ Build a PrestaShop shop named <name> in this sites folder and test it with websh
 # the builder deletes a project of the same name first: stop if <name> is a shop somebody still needs
 # nothing on the host: no php, composer, npm or mysql outside the shop's container
 # only the modules of the open-source release: no marketplace, account or hosted checkout module is installed, and no e-mail is sent
+# a feature to write or a run to read: the book Automated Functional Testing Recipes first (its README.md, then the matching chapter), from .claude/automated-functional-testing-recipes/ in the project, ~/.claude/automated-functional-testing-recipes/ or https://github.com/webship/webship-js-ai-agent/tree/2.0.x/automated-functional-testing-recipes
 
 1. bash cmd-prestashop-project.sh <name> --install --add-users
    (add --version <x> for a release other than the latest, --demo-catalog no for an empty shop)
