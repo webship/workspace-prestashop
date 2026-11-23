@@ -11,6 +11,14 @@
 # the console of the shop in its docroot; that file is how the functions here recognise one. The
 # installer is given the container's own database values (db / db / db) and nothing personal.
 #
+# The runtimes: a shop is built on DDEV, or with --runtime on Docker Compose, Podman, Kubernetes, Lando
+# or Docksal. The commands are the same on each: `ddev <verb>` is DDEV itself on a DDEV project, and on
+# another runtime the core's layer (fun-runtime.sh) gives the verb its meaning there. What differs is
+# behind prestashop_runtime: the address (prestashop_url, and the domain the installer is given, with
+# no HTTPS there), where the shop is in the container (/var/www/html on DDEV; asked of the container
+# elsewhere, prestashop_container_root), its docroot (in the x-webship block there), and the claim of
+# the plugin on the project (rt_claim: the type php says nothing of the platform).
+#
 # Only the open-source release is built: the installer is handed the list of the modules of the
 # open-source project, so the marketplace, account, hosted checkout, marketing and assistant modules
 # that travel in the downloaded archive stay uninstalled; the shop never sends an e-mail, and nothing
@@ -68,17 +76,38 @@ function set_prestashop_users() {
   done
 }
 
-# The docroot of a project, from its own container configuration.
+# The runtime of the project in this folder, or of a new build (--runtime, else the workspace's
+# setting, else DDEV). A core without the runtime layer has DDEV only.
+function prestashop_runtime() {
+  if declare -f runtime_of > /dev/null ; then runtime_of ; else echo 'ddev' ; fi
+}
+
+# The address of the site in this folder: https://<name>.ddev.site on DDEV, http://127.0.0.1:<port> on
+# Docker Compose, Podman and Lando, the node's address and a port on Kubernetes, http://<name>.docksal.site
+# on Docksal. Asked after `ddev config`.
+function prestashop_url() {
+  if declare -f rt_url > /dev/null ; then rt_url ; else echo "https://${PROJECT_NAME}.ddev.site" ; fi
+}
+
+# The docroot of a project, from its own container configuration: .ddev/config.yaml on DDEV, the
+# x-webship block (the core's rt_meta) on another runtime.
 function prestashop_docroot() {
   local project_path="$1" docroot ;
-  docroot="$(grep -E '^docroot:' "${project_path}/.ddev/config.yaml" 2>/dev/null | head -1 | sed -E 's/^docroot:[[:space:]]*//; s/^"(.*)"$/\1/; s/[[:space:]]*$//')" ;
+  if [ ! -f "${project_path}/.ddev/config.yaml" ] && declare -f rt_meta > /dev/null ; then
+    docroot="$(rt_meta docroot "${project_path}")" ;
+  else
+    docroot="$(grep -E '^docroot:' "${project_path}/.ddev/config.yaml" 2>/dev/null | head -1 | sed -E 's/^docroot:[[:space:]]*//; s/^"(.*)"$/\1/; s/[[:space:]]*$//')" ;
+  fi
   printf '%s' "${docroot}" ;
 }
 
 # Is this folder a PrestaShop project? The console and the shop's own definitions in the docroot say so.
 function prestashop_is_project() {
   local project_path="$1" docroot ;
-  [ -f "${project_path}/.ddev/config.yaml" ] || return 1 ;
+  # A DDEV project, or one of another runtime the plugin claims (the core's rt_is_platform reads it).
+  if [ ! -f "${project_path}/.ddev/config.yaml" ] ; then
+    declare -f rt_is_platform > /dev/null && rt_is_platform "${project_path}" prestashop || return 1 ;
+  fi
   docroot="$(prestashop_docroot "${project_path}")" ;
   [ -f "${project_path}/${docroot:+${docroot}/}bin/console" ] && [ -f "${project_path}/${docroot:+${docroot}/}config/defines.inc.php" ] ;
 }
@@ -114,10 +143,16 @@ function prestashop_enter_project() {
   cd "${project_path}" || return 1 ;
 }
 
-# Where the shop is in the container of the project the shell is in.
+# Where the shop is in the container of the project the shell is in: under /var/www/html on DDEV; on
+# another runtime the container is asked where the project is (/var/www/html on Docker Compose, Podman
+# and Kubernetes, /app on Lando, /var/www on Docksal).
 function prestashop_container_root() {
-  local docroot ; docroot="$(prestashop_docroot "$(pwd)")" ;
-  printf '%s' "/var/www/html${docroot:+/${docroot}}" ;
+  local docroot base='/var/www/html' ; docroot="$(prestashop_docroot "$(pwd)")" ;
+  if [ "$(prestashop_runtime)" != 'ddev' ] ; then
+    base="$(ddev exec pwd 2>/dev/null | tr -d '\r' | tail -1)" ;
+    base="${base:-/var/www/html}" ;
+  fi
+  printf '%s' "${base}${docroot:+/${docroot}}" ;
 }
 
 # Run the console of the shop in the container of the project the shell is in, in the environment
@@ -159,8 +194,12 @@ print(mine[0]["version"], mine[0]["zip_download_url"], mine[0]["zip_md5"])
 # Build a PrestaShop shop from nothing: the container, the code, and with --install the shop itself.
 function prestashop_build() {
   trim_project_name ;
-  local host="${PROJECT_NAME}.ddev.site" ;
-  local base_url="https://${host}" ;
+  local host base_url runtime ssl=1 ;
+  runtime="$(prestashop_runtime)" ;
+  if [ "${RUNTIME:-_none_}" != '_none_' ] && [ "${RUNTIME}" != "${runtime}" ] ; then
+    echo "--runtime ${RUNTIME} needs a Webship Workspace with the container runtimes (webship/workspace#694): update the workspace, or build on DDEV." ;
+    exit 1 ;
+  fi
   local version="${VERSION:-${site_version:-latest}}" ;
   local php_version="${PHP_VERSION:-${site_php_version:-8.3}}" ;
   local docroot="${distribution_webroot}" ;
@@ -188,7 +227,19 @@ function prestashop_build() {
   ddev config --project-type=php --docroot="${docroot}" --project-name=${PROJECT_NAME} \
     --php-version=${php_version} --webserver-type=apache-fpm --database=mariadb:10.11 \
     --nodejs-version=$(ddev_nodejs_version) || exit 1 ;
+  # On another runtime than DDEV the plugin claims the project, so the tools and the dashboard know it is
+  # a shop (the type php says nothing of the platform).
+  if [ "${runtime}" != 'ddev' ] ; then
+    rt_claim prestashop || exit 1 ;
+  fi
+  # The address is the runtime's to say, once the project is configured: never a written ddev.site.
+  # The installer is given its host (with the port there is one), and HTTPS only where there is HTTPS.
+  base_url="$(prestashop_url)" ;
+  host="${base_url#*://}" ;
+  [ "${base_url%%://*}" == 'https' ] || ssl=0 ;
   ddev_up start -y || exit 1 ;
+  # Where the shop is in the container: the container is asked on another runtime.
+  [ "${runtime}" != 'ddev' ] && root="$(prestashop_container_root)" ;
 
   local release archive checksum ;
   release="$(prestashop_release "${version}")" ;
@@ -213,7 +264,7 @@ function prestashop_build() {
       --name=$(printf '%q' "${doc_name} ${PROJECT_NAME}") --country=us --language=en --timezone=UTC \
       --firstname=Workspace --lastname=Owner \
       --email=$(printf '%q' "${account_mail}") --password=$(printf '%q' "${account_pass}") \
-      --ssl=1 --rewrite=1 --fixtures=${fixtures} --modules=${PRESTASHOP_MODULES}" \
+      --ssl=${ssl} --rewrite=1 --fixtures=${fixtures} --modules=${PRESTASHOP_MODULES}" \
       || { echo "The PrestaShop installer failed." ; exit 1 ; } ;
 
     # The shop refuses to open its back office while install/ is there, and the installer gave the
@@ -445,9 +496,9 @@ function prestashop_cli_tool() {
     set_prestashop_users ;
     cancel_prestashop_users ;
   else
-    echo "${doc_name}/${PROJECT_NAME}: $(prestashop_console --version 2>/dev/null | head -1) at https://${PROJECT_NAME}.ddev.site" ;
+    echo "${doc_name}/${PROJECT_NAME}: $(prestashop_console --version 2>/dev/null | head -1) at $(prestashop_url)" ;
     if prestashop_is_installed "$(pwd)" ; then
-      echo "The back office: https://${PROJECT_NAME}.ddev.site/$(prestashop_admin_folder "$(pwd)")" ;
+      echo "The back office: $(prestashop_url)/$(prestashop_admin_folder "$(pwd)")" ;
       echo "" ; users=() ; prestashop_accounts list ;
     else
       echo "The shop is not installed yet: open its address, or build it again with --install." ;

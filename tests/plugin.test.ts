@@ -68,13 +68,19 @@ test('the build keeps the shop to itself: the open-source modules only, SSL on, 
     assert.ok(!modules.includes(m), `${m} stays uninstalled`);
   }
   assert.match(src, /--modules=\$\{PRESTASHOP_MODULES\}/, 'the installer is handed that list');
-  assert.match(src, /--ssl=1 /, 'SSL is on');
+  // HTTPS where the address is HTTPS (DDEV's): the address of the other runtimes is plain HTTP.
+  assert.match(src, /--ssl=\$\{ssl\} /, 'SSL follows the address');
+  assert.match(src, /local host base_url runtime ssl=1 ;/, 'SSL is on unless the address says otherwise');
+  assert.match(src, /\[ "\$\{base_url%%:\/\/\*\}" == 'https' \] \|\| ssl=0 ;/);
   assert.match(src, /--domain=\$\{host\} /, 'the domain is the address of the project');
   assert.match(src, /--fixtures=\$\{fixtures\} /, 'the demo catalog is an option');
   assert.match(src, /SET value='3' WHERE name='PS_MAIL_METHOD'/, 'the shop never sends an e-mail');
   assert.match(src, /md5sum -c -/, 'the archive is checked against the checksum of the release list');
   assert.match(src, /api\.prestashop-project\.org\/prestashop'/, 'the release list is the open-source project\'s');
   assert.doesNotMatch(src, /addons\.prestashop|ps_accounts|ps_mbo/, 'nothing of a marketplace or a vendor account');
+  assert.doesNotMatch(src.replace(/^\s*#.*$/gm, '').replace(/echo "https:\/\/\$\{PROJECT_NAME\}\.ddev\.site"/, ''), /ddev\.site/, 'ddev.site only as the answer of a core with no layer');
+  assert.doesNotMatch(src.replace(/^\s*#.*$/gm, ''), /(?<![.\w])(docker|podman|kubectl) |command ddev/, 'only `ddev <verb>`: the layer chooses');
+  assert.match(src, /rt_claim prestashop/, 'on another runtime the plugin claims the shop: its type is php');
 });
 
 test('each agent is a definition the AI Agents folder can list: named after its file, described, on the fable model', () => {

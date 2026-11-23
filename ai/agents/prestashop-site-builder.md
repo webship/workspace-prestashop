@@ -39,12 +39,14 @@ bash cmd-prestashop-project.sh myshop --install --add-users
 | `--php-version <x>` | The PHP of the project container (`8.3` by default; PrestaShop 9 runs on 8.1 and later). |
 | `--launch` | Opens the shop when it is ready. |
 
-The shop answers at `https://<name>.ddev.site`, the back office at `/admin-workspace`: the installer
+On DDEV the shop answers at `https://<name>.ddev.site`, the back office at `/admin-workspace`: the installer
 gives that folder a random name and the builder pins it. An employee and a customer sign in with
 their e-mail address. The code is in the `public/` folder of the project. The builder **deletes a
 project of the same name first**: a build is a clean slate, so never point it at a shop somebody
 still needs. The name is a folder, a container project and a host name: short, lowercase, letters
 and digits.
+
+With `--runtime docker`, `podman`, `kubernetes`, `lando` or `docksal` the shop is built on that runtime instead, at the address the build prints (`http://127.0.0.1:<port>`, the node's address and a port, or `http://<name>.docksal.site`): never write a `ddev.site` address for such a shop. Its mailbox is at the address `rt_mail_url` gives, and the same commands work on it.
 
 The shop asks for a password of 8 characters or more. When the workspace account's is shorter the
 builder says so before it starts: do not invent another password, ask for the setting to be changed.

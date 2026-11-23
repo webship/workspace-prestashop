@@ -190,3 +190,132 @@ test('the first feature names no platform in a step, signs in as each employee, 
   const passwords = feature.match(/ and "([^"]*)"$/gm) || [];
   assert.deepStrictEqual(passwords, [' and "wrong-password"'], 'the only password is a wrong one, the subject of its scenario');
 });
+
+// ---- The runtimes: DDEV as before, and Docker Compose, Podman, Kubernetes, Lando and Docksal through the core's layer ----
+
+const ADDRESSES: Record<string, string> = {
+  docker: 'http://127.0.0.1:41234', podman: 'http://127.0.0.1:41234', lando: 'http://127.0.0.1:41234',
+  kubernetes: 'http://172.18.0.2:30080', docksal: 'http://shop1.docksal.site',
+};
+// Where each runtime keeps the project in its container: what `ddev exec pwd` answers from the project folder.
+const ROOTS: Record<string, string> = { docker: '/var/www/html', podman: '/var/www/html', kubernetes: '/var/www/html', lando: '/app', docksal: '/var/www' };
+
+/**
+ * Run the builder in a throwaway workspace with `ddev` replaced by a recorder, the release list by a stand-in, and the
+ * core's layer by stand-ins: `layer` is the runtime it answers with (runtime_of, rt_url, rt_claim), or '' for a core
+ * that has no layer yet. The recorder answers `ddev exec pwd` with the runtime's root in the container.
+ */
+function build(layer: string, env: Record<string, string> = {}) {
+  const p = project('prestashop');
+  fs.rmSync(p.dir, { recursive: true });
+  const log = path.join(p.root, 'ddev.log');
+  const address = ADDRESSES[layer] || '';
+  const prelude = [
+    `ddev() { echo "ddev $*" >> "${log}" ; [ "$*" == "exec pwd" ] && echo "${ROOTS[layer] || '/var/www/html'}" ; [ -t 0 ] || cat > /dev/null ; return 0 ; }`,
+    'trim_project_name() { :; } ; drop_database() { :; } ; ddev_nodejs_version() { echo 24 ; } ; ddev_up() { ddev "$@" ; }',
+    layer ? `runtime_of() { echo "\${RUNTIME_ANSWER}" ; } ; rt_url() { [ "\${RUNTIME_ANSWER}" == ddev ] && echo "https://\${PROJECT_NAME}.ddev.site" || echo "${address}" ; } ; rt_claim() { echo "rt_claim $* in $(basename "$PWD")" >> "${log}" ; } ; rt_meta() { [ "$1" == docroot ] && echo public ; }` : '',
+    `source ${FUNCTIONS}`,
+    'prestashop_release() { echo "9.0.1 https://example.com/release.zip 0123456789abcdef" ; }',
+    'prestashop_build',
+  ].join('\n');
+  const r = spawnSync('bash', ['-c', prelude], { encoding: 'utf8', env: { ...process.env, WORKSPACE_ROOT: p.root, WORKSPACE_SCRIPTS: p.scripts, doc_name: 'dev', PROJECT_NAME: 'shop1',
+    INSTALL: 'yes', ADD_USERS: 'no', LAUNCH: 'no', DEMO_CATALOG: 'yes', VERSION: 'latest', PHP_VERSION: '8.3', distribution_webroot: 'public',
+    RUNTIME: '_none_', RUNTIME_ANSWER: layer || 'ddev', account_name: 'webmaster', account_pass: 'Change_Me.123123', account_mail: 'webmaster@example.com', ...env },
+    stdio: ['ignore', 'pipe', 'pipe'] });
+  const calls = fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim().split('\n').filter((c) => /^(ddev|rt_claim) /.test(c)) : [];
+  return { r, calls, dir: path.join(p.root, 'dev', 'shop1') };
+}
+
+test('on DDEV the build is what it was: the same commands with the layer and without it, HTTPS at the ddev.site domain', () => {
+  const without = build('');
+  const withLayer = build('ddev');
+  for (const b of [without, withLayer]) {
+    assert.strictEqual(b.r.status, 0, b.r.stderr + b.r.stdout);
+    assert.match(b.r.stdout, /Go to https:\/\/shop1\.ddev\.site\/admin-workspace and log in as webmaster@example\.com/);
+  }
+  assert.deepStrictEqual(withLayer.calls, without.calls);
+  const install = without.calls.find((c) => c.includes('install/index_cli.php'));
+  assert.ok(install && install.startsWith('ddev exec -d /var/www/html/public php install/index_cli.php --domain=shop1.ddev.site '), install);
+  assert.match(install, / --ssl=1 /);
+  assert.ok(!without.calls.includes('ddev exec pwd'), 'DDEV is not asked where the project is');
+  assert.ok(!without.calls.some((c) => c.startsWith('rt_claim ')), 'on DDEV nothing is claimed');
+});
+
+test('on Docker Compose, Podman, Kubernetes, Lando and Docksal the plugin claims the shop and installs it at the runtime\'s host, in the runtime\'s root, without HTTPS', () => {
+  for (const runtime of Object.keys(ADDRESSES)) {
+    const address = ADDRESSES[runtime];
+    const host = address.replace(/^https?:\/\//, '');
+    const root = `${ROOTS[runtime]}/public`;
+    const b = build(runtime, { RUNTIME: runtime });
+    assert.strictEqual(b.r.status, 0, runtime + ': ' + b.r.stderr + b.r.stdout);
+    assert.deepStrictEqual(b.calls.slice(0, 2).map((c) => c.split(' --')[0]), ['ddev config', 'rt_claim prestashop in shop1'], runtime);
+    assert.ok(b.calls.some((c) => c.includes(`unzip -q -o prestashop.zip -d '${root}'`)), `${runtime}: the code goes to the runtime's root`);
+    const install = b.calls.find((c) => c.includes('install/index_cli.php'));
+    assert.ok(install && install.startsWith(`ddev exec -d ${root} php install/index_cli.php --domain=${host} `), `${runtime}: ${install}`);
+    assert.match(install, / --ssl=0 /, runtime);
+    assert.match(install, /--db_server=db --db_name=db --db_user=db --db_password=db/, runtime);
+    assert.ok(!fs.existsSync(path.join(b.dir, '.ddev')), `${runtime}: nothing of DDEV's is written`);
+    assert.match(b.r.stdout, new RegExp(`Go to ${address.replace(/[.]/g, '\\.')}/admin-workspace and log in as webmaster@example\\.com`), runtime);
+    assert.doesNotMatch(b.r.stdout, /ddev\.site/, runtime);
+  }
+});
+
+test('--runtime on a workspace without the runtime layer is refused, never built on DDEV in silence', () => {
+  const b = build('', { RUNTIME: 'docker' });
+  assert.strictEqual(b.r.status, 1);
+  assert.match(b.r.stdout, /--runtime docker needs a Webship Workspace with the container runtimes/);
+  assert.deepStrictEqual(b.calls, []);
+  assert.ok(!fs.existsSync(b.dir), 'no folder was made');
+  assert.strictEqual(build('', { RUNTIME: 'ddev' }).r.status, 0);
+});
+
+test('the builder takes --runtime, with the runtimes of the core\'s own builders', () => {
+  const args = fs.readFileSync(path.join(PKG, 'scripts', 'args', 'arg-prestashop.sh'), 'utf8');
+  assert.match(args, /parser\.add_argument\('--runtime',\s+dest='RUNTIME',\s+default="_none_",\s+choices=\['ddev', 'docker', 'podman', 'kubernetes', 'lando', 'docksal'\],/);
+});
+
+/** A shop of another runtime: compose.yaml with the plugin's claim and the docroot, the shop's files, no .ddev folder. */
+function runtimeShop() {
+  const p = project('prestashop');
+  fs.rmSync(path.join(p.dir, '.ddev'), { recursive: true });
+  fs.writeFileSync(path.join(p.dir, 'compose.yaml'), 'name: shop1\nx-webship:\n  platform: prestashop\n  runtime: lando\n  type: php\n  docroot: "public"\n  port: 41234\n');
+  return p;
+}
+const LAYER = 'runtime_of() { echo lando ; } ; rt_is_platform() { grep -q "^  platform: $2$" "$1/compose.yaml" 2>/dev/null ; } ; rt_meta() { sed -n "s/^  $1: *//p" "$2/compose.yaml" | head -1 | tr -d \'"\' ; } ; rt_url() { echo http://127.0.0.1:41234 ; } ; ';
+
+test('a shop is known on every runtime: the claim through the core\'s layer, its docroot from the x-webship block', () => {
+  const rt = runtimeShop();
+  assert.strictEqual(bash(`${LAYER} prestashop_is_project ${rt.dir}`).status, 0);
+  assert.notStrictEqual(bash(`prestashop_is_project ${rt.dir}`).status, 0, 'an older core reads no compose.yaml');
+  assert.strictEqual(bash(`${LAYER} prestashop_docroot ${rt.dir}`).stdout, 'public');
+  assert.strictEqual(bash(`prestashop_is_project ${project('prestashop').dir}`).status, 0, 'DDEV as before');
+  assert.notStrictEqual(bash(`${LAYER} prestashop_is_project ${project('other').dir}`).status, 0);
+});
+
+test('the console tool runs in the runtime\'s root on a shop of a runtime, and says its address', () => {
+  const rt = runtimeShop();
+  const log = path.join(rt.root, 'ddev.log');
+  const env = { WORKSPACE_ROOT: rt.root, doc_name: 'dev', PROJECT_NAME: 'shop1', DDEV_LOG: log };
+  const pwd = 'ddev() { echo "ddev $*" >> "${DDEV_LOG:-/dev/null}" ; [ "$*" == "exec pwd" ] && echo /app ; [ -t 0 ] || cat > /dev/null ; return 0 ; } ; ';
+  const what = bash(`${pwd} ${LAYER} trim_project_name() { :; } ; RUN=_none_ ; CLEAR_CACHE=no ; ADD_USERS=no ; CANCEL_USERS=no ; prestashop_cli_tool`, env);
+  assert.strictEqual(what.status, 0, what.stdout + what.stderr);
+  assert.match(what.stdout, /^dev\/shop1: .* at http:\/\/127\.0\.0\.1:41234$/m);
+  assert.match(what.stdout, /^The back office: http:\/\/127\.0\.0\.1:41234\/admin-workspace$/m);
+  assert.doesNotMatch(what.stdout, /ddev\.site/);
+  fs.writeFileSync(log, '');
+  bash(`${pwd} ${LAYER} trim_project_name() { :; } ; RUN="prestashop:module:list" ; prestashop_cli_tool`, env);
+  assert.match(fs.readFileSync(log, 'utf8'), /^ddev exec -d \/app\/public SYMFONY_ENV=prod php bin\/console prestashop:module:list$/m);
+});
+
+test('the feature of the runtimes drives a shop the plugin claims, and names no platform in a step', () => {
+  const feature = fs.readFileSync(path.join(PKG, 'features', 'prestashop-runtimes.feature'), 'utf8');
+  const scenarios = feature.split(/\n(?=  @needs-runtime-)/).slice(1);
+  assert.strictEqual(scenarios.length, 6);
+  for (const s of scenarios) assert.match(s, /^  @needs-runtime-(docker|kubernetes) @needs-platform-prestashop\n  Scenario: /);
+  const steps = feature.split('\n').filter((l) => /^\s*(Given|When|Then|And|But) /.test(l));
+  for (const s of steps) assert.doesNotMatch(s, /prestashop/i, s);
+  assert.doesNotMatch(feature, /ddev\.site|127\.0\.0\.1/);
+  const manifest = JSON.parse(fs.readFileSync(path.join(PKG, 'package.json'), 'utf8')).workspacePlugin;
+  assert.ok(manifest.features.includes('features/prestashop-runtimes.feature'));
+  assert.match(manifest.featuresSite, /^cmd-prestashop-project\.sh ci-prestashop( [A-Za-z0-9._=-]+)* --runtime docker$/);
+});

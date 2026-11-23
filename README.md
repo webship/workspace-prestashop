@@ -78,6 +78,7 @@ A workspace that knows none of this (Webship Workspace 1.0.8 and older) ignores 
 | `ai/prompts/prestashop-build-and-test.md` | A prompt: the whole launch command for a new session |
 | `src/index.ts` | `register(api)`: what the assistant is told about PrestaShop here |
 | `features/prestashop.feature` | Scenarios for the dashboard's own browser suite |
+| `features/prestashop-runtimes.feature` | The row, the test users and two pages of a shop built on Docker Compose and on Kubernetes |
 | `docs/plugin-items-pattern.md` | How a plugin carries its own commands and AI items, and how to prove it |
 
 The `workspacePlugin` block in `package.json` is the manifest the installer reads.
@@ -100,9 +101,10 @@ bash cmd-prestashop-project.sh myshop --install --add-users
 | `--add-users` | With `--install`: add the default accounts, an administrator, an employee with a limited profile and two customers |
 | `--demo-catalog <yes\|no>` | With `--install`: the demo catalog of the release (products, categories, customers, orders). `yes` by default; `no` gives an empty shop |
 | `--php-version <x>` | The PHP of the project container (`8.3`) |
+| `--runtime <name>` | The container runtime to build on: `ddev` (the default), `docker`, `kubernetes`, `podman`, `lando` or `docksal`. See [Runtimes](#runtimes) |
 | `--launch` | Open the shop when it is ready |
 
-The shop answers at `https://myshop.ddev.site`, the back office at `/admin-workspace`. The container
+On DDEV the shop answers at `https://myshop.ddev.site`, the back office at `/admin-workspace`. The container
 tool has no project type for PrestaShop, so the build runs `ddev config --project-type=php` with the
 docroot `public`, Apache (the shop routes its addresses through `.htaccess`), MariaDB 10.11 and the
 Node.js of the workspace (24). It reads the release list the project publishes, downloads the
@@ -123,6 +125,61 @@ What the build does to keep the shop to itself:
 An employee and a customer sign in with their e-mail address: the SuperAdmin with the address of
 the workspace account. The shop asks for a password of 8 characters or more: `--install` stops
 before it starts when the workspace account's is shorter.
+
+
+### Runtimes
+
+```bash
+bash cmd-prestashop-project.sh myshop --install --add-users                        # DDEV, the default
+bash cmd-prestashop-project.sh myshop --install --add-users --runtime docker       # Docker Compose
+bash cmd-prestashop-project.sh myshop --install --add-users --runtime kubernetes   # a Kubernetes cluster
+bash cmd-prestashop-project.sh myshop --install --add-users --runtime lando        # Lando
+bash cmd-prestashop-project.sh myshop --install --add-users --runtime docksal      # Docksal
+```
+
+Without `--runtime` a build takes `container.runtime` of the workspace's `settings.yml`, then DDEV.
+It needs a Webship Workspace with the container runtimes
+([webship/workspace#694](https://github.com/webship/workspace/issues/694)); on an older one the
+builder refuses `--runtime` and builds on DDEV only. Lando and Docksal need a Workspace whose runtime
+layer has them ([webship/workspace#729](https://github.com/webship/workspace/issues/729),
+[#730](https://github.com/webship/workspace/issues/730)).
+
+| | DDEV | Docker Compose | Kubernetes | Podman | Lando | Docksal |
+| --- | --- | --- | --- | --- | --- | --- |
+| Build with `--install --add-users`, the demo catalog | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| The shop and its back office; a sign-in as the workspace account, the two employees (the Salesman profile refused what it may not open) and a customer | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| `cmd-tools-prestashop-cli.sh`: what the shop is, with its accounts, `--run`, `--clear-cache` | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| Test users, cancelled and added | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| The mailbox: the shop sends nothing (its password recovery adds no mail), PHP's own `mail()` is caught by Mailpit | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| The testing setup and the first feature | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| The step pack's examples (74 scenarios) | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| Export and import the database | Yes | Yes | Yes | Not yet run | Yes | Yes |
+| The row in the dashboard, and remove | Yes | Yes | Yes | Not yet run | Yes | Yes |
+
+"Yes" means it was run on a real shop of that runtime. Podman runs the same code as Docker Compose
+and was not run yet. On DDEV the row's Tests menu does not offer the test users of a shop, as before:
+the project type `php` names no platform, and the builder writes no claim of the plugin there (on the
+other runtimes it does). `bash cmd-tools-add-users.sh myshop prestashop` adds them on every runtime.
+
+| Runtime | The shop's address | What the project carries |
+| --- | --- | --- |
+| DDEV | `https://myshop.ddev.site` | `.ddev/config.yaml` |
+| Docker Compose | `http://127.0.0.1:<port>`, printed by the build | `compose.yaml`, `.webship/runtime/Dockerfile` |
+| Kubernetes | `http://<node address>:<port>`, printed by the build | The same, and `k8s/` (the namespace `ws-myshop`) |
+| Lando | `http://127.0.0.1:<port>`, printed by the build | `.lando.yml` (Lando's proxy stays off) |
+| Docksal | `http://myshop.docksal.site`, on Docksal's own proxy | `.docksal/docksal.env`, `.docksal/docksal.yml` |
+
+What differs on Docker Compose, Kubernetes, Lando and Docksal:
+
+- **The address the installer is given** is the runtime's (`127.0.0.1:<port>`, the node's address and a port, or `<name>.docksal.site`), with no HTTPS (`--ssl=0`) where the runtime serves plain HTTP. The shop keeps its address in its database: a shop stays on the runtime it was built on.
+- **Where the shop is in its container** (`/var/www/html/public`, `/app/public` on Lando, `/var/www/public` on Docksal) is asked of the container, for the code's unpacking, the console and the accounts.
+- **The claim:** the project's type is `php`, which says nothing of the platform, so the build claims the project for the plugin (`rt_claim prestashop`): `cmd-tools-prestashop-cli.sh`, the test users, the testing setup and the dashboard then know it is a shop.
+- **Mail:** the shop sends none on any runtime, as on DDEV (the builder sets its mail method to never send); the runtime's mail catcher is there for the rest of the project, and PHP's own `mail()` reaches it.
+- **HTTPS and a host name** are DDEV's: a runtime's address is plain HTTP.
+
+The same commands work on every runtime: `cmd-tools-prestashop-cli.sh`, `cmd-tools-add-users.sh`,
+`cmd-tools-testing.sh`. The pattern is the Workspace's
+[`core/docs/plugins-on-runtimes.md`](https://github.com/webship/workspace/blob/1.0.x/core/docs/plugins-on-runtimes.md).
 
 ### Work on a shop
 
