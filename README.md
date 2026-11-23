@@ -157,13 +157,13 @@ layer has them ([webship/workspace#729](https://github.com/webship/workspace/iss
 | The row in the dashboard, and remove | Yes | Yes | Yes | Not yet run | Yes | Yes |
 
 "Yes" means it was run on a real shop of that runtime. Podman runs the same code as Docker Compose
-and was not run yet. On DDEV the row's Tests menu does not offer the test users of a shop, as before:
-the project type `php` names no platform, and the builder writes no claim of the plugin there (on the
-other runtimes it does). `bash cmd-tools-add-users.sh myshop prestashop` adds them on every runtime.
+and was not run yet. The project type `php` names no platform, so the builder claims the shop for the
+plugin, on every runtime: `.ddev/config.prestashop.yaml` on DDEV, `platform: prestashop` in the
+`x-webship` block elsewhere. By that claim the row's Tests menu offers the shop's test users.
 
 | Runtime | The shop's address | What the project carries |
 | --- | --- | --- |
-| DDEV | `https://myshop.ddev.site` | `.ddev/config.yaml` |
+| DDEV | `https://myshop.ddev.site` | `.ddev/config.yaml`, and the plugin's claim `.ddev/config.prestashop.yaml` |
 | Docker Compose | `http://127.0.0.1:<port>`, printed by the build | `compose.yaml`, `.webship/runtime/Dockerfile` |
 | Kubernetes | `http://<node address>:<port>`, printed by the build | The same, and `k8s/` (the namespace `ws-myshop`) |
 | Lando | `http://127.0.0.1:<port>`, printed by the build | `.lando.yml` (Lando's proxy stays off) |

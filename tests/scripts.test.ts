@@ -241,6 +241,24 @@ test('on DDEV the build is what it was: the same commands with the layer and wit
   assert.ok(!without.calls.some((c) => c.startsWith('rt_claim ')), 'on DDEV nothing is claimed');
 });
 
+test('on DDEV the builder leaves the plugin\'s claim, .ddev/config.prestashop.yaml, which the dashboard reads for the test users', () => {
+  for (const layer of ['', 'ddev']) {
+    const b = build(layer);
+    assert.strictEqual(b.r.status, 0, b.r.stderr + b.r.stdout);
+    const claim = path.join(b.dir, '.ddev', 'config.prestashop.yaml');
+    assert.ok(fs.existsSync(claim), `${layer || 'no layer'}: the claim is written`);
+    const text = fs.readFileSync(claim, 'utf8');
+    // An overlay of the container tool, with one key nothing of the shop reads: the same shape as the phpBB and
+    // bbPress plugins' claims. The dashboard takes the name between "config." and ".yaml", and finds the list of the
+    // same name (set_prestashop_users) in the plugin's functions.
+    const keys = text.split('\n').filter((l) => /^[a-z_]+:/.test(l));
+    assert.deepStrictEqual(keys, ['web_environment:'], layer);
+    assert.match(text, /^web_environment:\n {2}- WEBSHIP_WORKSPACE_PLATFORM=prestashop\n$/m, layer);
+    assert.match(path.basename(claim), /^config\.([a-z0-9][a-z0-9-]*)\.ya?ml$/);
+    assert.match(fs.readFileSync(FUNCTIONS, 'utf8'), /^function set_prestashop_users\(\) \{$/m, 'the list the claim names');
+  }
+});
+
 test('on Docker Compose, Podman, Kubernetes, Lando and Docksal the plugin claims the shop and installs it at the runtime\'s host, in the runtime\'s root, without HTTPS', () => {
   for (const runtime of Object.keys(ADDRESSES)) {
     const address = ADDRESSES[runtime];
