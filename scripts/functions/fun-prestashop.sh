@@ -16,8 +16,12 @@
 # another runtime the core's layer (fun-runtime.sh) gives the verb its meaning there. What differs is
 # behind prestashop_runtime: the address (prestashop_url, and the domain the installer is given, with
 # no HTTPS there), where the shop is in the container (/var/www/html on DDEV; asked of the container
-# elsewhere, prestashop_container_root), its docroot (in the x-webship block there), and the claim of
-# the plugin on the project (rt_claim: the type php says nothing of the platform).
+# elsewhere, prestashop_container_root), and its docroot (in the x-webship block there).
+#
+# The claim: the type php says nothing of the platform, so the builder claims the project for the plugin,
+# by which the dashboard's row knows the shop and offers its test users. On DDEV that is
+# .ddev/config.prestashop.yaml (prestashop_write_claim, as the phpBB plugin writes .ddev/config.phpbb.yaml);
+# on another runtime it is `platform: prestashop` in the x-webship block (the core's rt_claim).
 #
 # Only the open-source release is built: the installer is handed the list of the modules of the
 # open-source project, so the marketplace, account, hosted checkout, marketing and assistant modules
@@ -143,6 +147,24 @@ function prestashop_enter_project() {
   cd "${project_path}" || return 1 ;
 }
 
+# The claim of this plugin on a DDEV project, in the folder of the container tool: a config overlay with one
+# key the shop does not read, the name of the platform the project was built as. The dashboard reads the
+# file's name: a project that carries config.<plugin>.yaml takes the test users of that plugin.
+function prestashop_write_claim() {
+  local project_path="$1" ;
+  mkdir -p "${project_path}/.ddev" || return 1 ;
+  cat > "${project_path}/.ddev/config.prestashop.yaml" <<'YAMLEOF'
+# Written by the PrestaShop plugin of the Webship Workspace (cmd-prestashop-project.sh).
+#
+# It is the plugin's claim on this project: the project type php names no platform, so the workspace's
+# tools and its dashboard read this file to know the shop, and take its test users for it
+# (cmd-tools-add-users.sh <project> prestashop). The key below is in the environment of the web container
+# from its next start; nothing of the shop reads it.
+web_environment:
+  - WEBSHIP_WORKSPACE_PLATFORM=prestashop
+YAMLEOF
+}
+
 # Where the shop is in the container of the project the shell is in: under /var/www/html on DDEV; on
 # another runtime the container is asked where the project is (/var/www/html on Docker Compose, Podman
 # and Kubernetes, /app on Lando, /var/www on Docksal).
@@ -227,10 +249,12 @@ function prestashop_build() {
   ddev config --project-type=php --docroot="${docroot}" --project-name=${PROJECT_NAME} \
     --php-version=${php_version} --webserver-type=apache-fpm --database=mariadb:10.11 \
     --nodejs-version=$(ddev_nodejs_version) || exit 1 ;
-  # On another runtime than DDEV the plugin claims the project, so the tools and the dashboard know it is
-  # a shop (the type php says nothing of the platform).
+  # The plugin claims the project, so the tools and the dashboard know it is a shop (the type php says
+  # nothing of the platform): a file of its own in .ddev/ on DDEV, the x-webship block on another runtime.
   if [ "${runtime}" != 'ddev' ] ; then
     rt_claim prestashop || exit 1 ;
+  else
+    prestashop_write_claim "$(pwd)" || { echo "The plugin's claim on the project could not be written." ; exit 1 ; } ;
   fi
   # The address is the runtime's to say, once the project is configured: never a written ddev.site.
   # The installer is given its host (with the port there is one), and HTTPS only where there is HTTPS.
