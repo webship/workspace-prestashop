@@ -5,7 +5,8 @@
 # Installed by the PrestaShop plugin (plugins.sh --install prestashop); __WORKSPACE__ is the workspace it was installed into.
 #
 # Build a PrestaShop shop in a container: the latest stable 9.x release of the open-source project,
-# or the one --version names, at https://<name>.ddev.site. With --install the shop is installed with
+# or the one --version names, on DDEV (the default) at https://<name>.ddev.site, or
+# with --runtime docker, podman, kubernetes, lando or docksal at the address the build prints. With --install the shop is installed with
 # the workspace account as its SuperAdmin and, unless --demo-catalog no, with the demo catalog; with
 # --add-users it also gets the default accounts: an administrator, an employee with a limited profile
 # and two customers.

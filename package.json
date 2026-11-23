@@ -83,8 +83,10 @@
       ]
     },
     "features": [
-      "features/prestashop.feature"
-    ]
+      "features/prestashop.feature",
+      "features/prestashop-runtimes.feature"
+    ],
+    "featuresSite": "cmd-prestashop-project.sh ci-prestashop --install --add-users --runtime docker"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

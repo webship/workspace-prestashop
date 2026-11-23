@@ -36,7 +36,7 @@ export function assistantContext(): string {
   return [
     'PrestaShop (a plugin, @webship.co/workspace-prestashop): a PrestaShop 9 shop of the open-source release is built with',
     '`bash cmd-prestashop-project.sh <name> --install --add-users` from a sites folder (dev, test, sandboxes, demos),',
-    'in a container like every other project, at https://<name>.ddev.site (the back office at /admin-workspace), with the demo catalog unless `--demo-catalog no`.',
+    'in a container like every other project: on DDEV by default, at https://<name>.ddev.site, or with `--runtime docker|podman|kubernetes|lando|docksal` on that runtime, at the address the build prints (the back office at /admin-workspace), with the demo catalog unless `--demo-catalog no`.',
     '`bash cmd-tools-prestashop-cli.sh <name>` says what the shop is; `--run "<command>"` runs the console of the shop (bin/console) in it,',
     '`--clear-cache` clears its cache, `--add-users` adds the default accounts (an administrator, an employee with the Salesman profile and two customers).',
     '`bash cmd-tools-add-users.sh <name> prestashop` adds the same accounts.',
